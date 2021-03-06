@@ -17,46 +17,49 @@ func main() {
 	}
 	defer f.Close()
 
-	out, err := os.Create("fcc.cgz64")
+	err = CSVToCZ64(f, os.Stdout)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer out.Close()
+}
 
-	r := csv.NewReader(f)
+func CSVToCZ64(in io.Reader, out io.Writer) error {
+	r := csv.NewReader(in)
 	for {
 		var csvbuf, gzbuf, b64buf bytes.Buffer
 		w := csv.NewWriter(&csvbuf)
-		gw := gzip.NewWriter(&gzbuf)
+		gw, err := gzip.NewWriterLevel(&gzbuf, gzip.BestCompression)
+		if err != nil {
+			return err
+		}
 		record, err := r.Read()
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
-			log.Fatal(err)
+			return err
 		}
 		err = w.Write(record)
 		if err != nil {
-			log.Fatal(err)
+			return err
 		}
 		w.Flush()
-		i, err := gw.Write(csvbuf.Bytes())
+		_, err = gw.Write(csvbuf.Bytes())
 		if err != nil {
-			log.Fatal(err)
+			return err
 		}
-		log.Print(i)
 		gw.Flush()
 		encoder := base64.NewEncoder(base64.StdEncoding, &b64buf)
-		i, err = encoder.Write(gzbuf.Bytes())
+		_, err = encoder.Write(gzbuf.Bytes())
 		if err != nil {
-			log.Fatal(err)
+			return err
 		}
-		log.Print(i)
 		encoder.Close()
 		_, err = out.Write(b64buf.Bytes())
 		if err != nil {
-			log.Fatal(err)
+			return err
 		}
-		out.WriteString("\n")
+		out.Write([]byte("\n"))
 	}
+	return nil
 }
